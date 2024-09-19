@@ -1,0 +1,319 @@
+<html><head><base href="https://bigdata.ai/platform/data-explorer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Explorer - BigData AI Platform</title>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@5.0.11/dist/browser/signalr.min.js"></script>
+<style>
+  body, html {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    height: 100%;
+    background-color: #f5f7fa;
+  }
+  .container {
+    display: flex;
+    height: 100%;
+  }
+  .sidebar {
+    width: 250px;
+    background-color: #2c3e50;
+    color: #ecf0f1;
+    padding: 20px;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+  }
+  .main-content {
+    flex-grow: 1;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  .search-container {
+    margin-bottom: 20px;
+  }
+  #ai-search {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 20px;
+    background-color: #34495e;
+    color: #ecf0f1;
+  }
+  #ai-search::placeholder {
+    color: #bdc3c7;
+  }
+  nav ul {
+    list-style-type: none;
+    padding: 0;
+  }
+  nav ul li {
+    margin-bottom: 10px;
+  }
+  nav ul li a {
+    color: #ecf0f1;
+    text-decoration: none;
+    display: block;
+    padding: 10px;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+  }
+  nav ul li a:hover, nav ul li a.active {
+    background-color: #34495e;
+  }
+  .data-explorer {
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    gap: 20px;
+  }
+  .data-sources {
+    background-color: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  }
+  .data-sources h2 {
+    margin-top: 0;
+    color: #2c3e50;
+  }
+  .data-sources ul {
+    list-style-type: none;
+    padding: 0;
+  }
+  .data-sources li {
+    margin-bottom: 10px;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+  }
+  .data-sources li:hover {
+    background-color: #ecf0f1;
+  }
+  .data-viewer {
+    background-color: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  }
+  .data-viewer h2 {
+    margin-top: 0;
+    color: #2c3e50;
+  }
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+  }
+  .data-table th, .data-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+  }
+  .data-table th {
+    background-color: #f2f2f2;
+  }
+  .chart-container {
+    margin-top: 20px;
+    height: 300px;
+  }
+  .controls {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+  }
+  .controls button {
+    padding: 10px 20px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  .controls button:hover {
+    background-color: #2980b9;
+  }
+  .query-builder {
+    margin-top: 20px;
+  }
+  .query-builder textarea {
+    width: 100%;
+    height: 100px;
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+  }
+</style>
+</head>
+<body>
+  <div id="app" class="container">
+    <div class="sidebar">
+      <h2>BigData AI Platform</h2>
+      <div class="search-container">
+        <input type="text" id="ai-search" placeholder="AI Search...">
+      </div>
+      <nav>
+        <ul>
+          <li><a href="https://bigdata.ai/platform/dashboard">Dashboard</a></li>
+          <li><a href="https://bigdata.ai/platform/data-explorer" class="active">Data Explorer</a></li>
+          <li><a href="https://bigdata.ai/platform/reports">Reports</a></li>
+          <li><a href="https://bigdata.ai/platform/settings">Settings</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="main-content">
+      <h1>Data Explorer</h1>
+      <div class="data-explorer">
+        <div class="data-sources">
+          <h2>Data Sources</h2>
+          <ul>
+            <li v-for="source in dataSources" :key="source.id" @click="selectDataSource(source)">
+              {{ source.name }}
+            </li>
+          </ul>
+        </div>
+        <div class="data-viewer">
+          <h2>{{ selectedSource ? selectedSource.name : 'Select a Data Source' }}</h2>
+          <div v-if="selectedSource">
+            <div class="query-builder">
+              <textarea v-model="query" placeholder="Enter your query here..."></textarea>
+              <button @click="executeQuery">Execute Query</button>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th v-for="column in columns" :key="column">{{ column }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in data" :key="row.id">
+                  <td v-for="column in columns" :key="column">{{ row[column] }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="chart-container">
+              <canvas id="dataChart"></canvas>
+            </div>
+            <div class="controls">
+              <button @click="downloadData">Download Data</button>
+              <button @click="shareData">Share Data</button>
+              <button @click="dataDrill">Data Drill</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    new Vue({
+      el: '#app',
+      data: {
+        dataSources: [
+          { id: 1, name: 'Customer Database' },
+          { id: 2, name: 'Sales Transactions' },
+          { id: 3, name: 'Product Inventory' },
+          { id: 4, name: 'Web Analytics' },
+        ],
+        selectedSource: null,
+        columns: [],
+        data: [],
+        query: '',
+        chart: null
+      },
+      methods: {
+        selectDataSource(source) {
+          this.selectedSource = source;
+          this.fetchData();
+        },
+        fetchData() {
+          // Simulating API call
+          setTimeout(() => {
+            if (this.selectedSource.id === 1) {
+              this.columns = ['id', 'name', 'email', 'country'];
+              this.data = [
+                { id: 1, name: 'John Doe', email: 'john@example.com', country: 'USA' },
+                { id: 2, name: 'Jane Smith', email: 'jane@example.com', country: 'Canada' },
+                { id: 3, name: 'Alice Johnson', email: 'alice@example.com', country: 'UK' },
+              ];
+            } else if (this.selectedSource.id === 2) {
+              this.columns = ['id', 'product', 'amount', 'date'];
+              this.data = [
+                { id: 1, product: 'Widget A', amount: 100, date: '2023-06-01' },
+                { id: 2, product: 'Widget B', amount: 200, date: '2023-06-02' },
+                { id: 3, product: 'Widget C', amount: 150, date: '2023-06-03' },
+              ];
+            }
+            this.updateChart();
+          }, 500);
+        },
+        executeQuery() {
+          console.log('Executing query:', this.query);
+          // Implement query execution logic here
+        },
+        updateChart() {
+          if (this.chart) {
+            this.chart.destroy();
+          }
+          const ctx = document.getElementById('dataChart').getContext('2d');
+          this.chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: this.data.map(item => item[this.columns[1]]),
+              datasets: [{
+                label: this.columns[2],
+                data: this.data.map(item => item[this.columns[2]]),
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: {
+                  beginAtZero: true
+                }
+              }
+            }
+          });
+        },
+        downloadData() {
+          console.log('Downloading data');
+          // Implement data download logic here
+        },
+        shareData() {
+          console.log('Sharing data');
+          // Implement data sharing logic here
+        },
+        dataDrill() {
+          console.log('Performing data drill');
+          // Implement data drill logic here
+        }
+      },
+      mounted() {
+        // Initialize real-time updates using SignalR
+        const connection = new signalR.HubConnectionBuilder()
+          .withUrl("/dataHub")
+          .build();
+
+        connection.on("ReceiveDataUpdate", (update) => {
+          console.log("Received data update:", update);
+          // Handle real-time data updates here
+        });
+
+        connection.start().catch(err => console.error(err));
+      }
+    });
+
+    // AI Search functionality
+    document.getElementById("ai-search").addEventListener("input", function(e) {
+      console.log("Searching for:", e.target.value);
+      // Implement AI search logic here
+    });
+  </script>
+</body>
+</html>
